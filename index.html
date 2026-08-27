@@ -77,7 +77,7 @@
         <!-- Encabezado Principal -->
         <header class="bg-white rounded-xl p-6 shadow-sm border-b-4 border-f99yellow flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div class="flex items-center gap-5">
-                <img src="https:https:"//raw.githubusercontent.com/antoniavasquez-oss/Carta-gantt/d041063352279d949000e59acdfc72f52c06ab54/f99-logo.png"
+                <img src="https://raw.githubusercontent.com/antoniavasquez-oss/Carta-gantt/d041063352279d949000e59acdfc72f52c06ab54/f99-logo.png" 
                      alt="Fundación 99 Logo" class="h-16 object-contain">
                 <div>
                     <div class="flex flex-wrap items-center gap-2 mb-1">
@@ -378,6 +378,9 @@
             { id: 16, phase: 'Fase 5: Inicio de Clases e Hito de Lanzamiento', name: 'Inicio de clases Diplomado en Educación F99', owner: 'Dirección F99', status: 'PENDING', tag: 'CPEIP', critical: false, startMonth: 14, endMonth: 14 }
         ];
 
+        // ==========================================
+        // ESTADO GLOBAL
+        // ==========================================
         let tasks = [];
         let activeFilter = 'ALL';
 
@@ -470,4 +473,341 @@
                             let roundedClass = '';
                             if (isStart && isEnd) roundedClass = 'rounded-md';
                             else if (isStart) roundedClass = 'rounded-l-md border-r-0';
-                            else if (isEnd) roundedClass = '
+                            else if (isEnd) roundedClass = 'rounded-r-md border-l-0';
+                            else roundedClass = 'rounded-none border-x-0';
+
+                            timelineGrid += `
+                                <div class="h-full flex items-center justify-center py-1">
+                                    <div class="w-full h-5 ${barColor} ${roundedClass} flex items-center justify-center text-[9px] text-white font-bold shadow-sm cursor-pointer" title="${task.name} (${monthNames[task.startMonth]} - ${monthNames[task.endMonth]})">
+                                        ${isStart ? '<span class="px-1 truncate">' + task.name.substring(0, 10) + '...</span>' : ''}
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            timelineGrid += '<div class="h-full"></div>';
+                        }
+                    }
+                    timelineGrid += '</div>';
+
+                    row.innerHTML = leftCol + timelineGrid;
+                    container.appendChild(row);
+                });
+            });
+
+            try {
+                localStorage.setItem('f99_gantt_tasks', JSON.stringify(tasks));
+            } catch (e) {
+                console.warn('Error al guardar en LocalStorage:', e);
+            }
+        }
+
+        function getStatusBadge(status) {
+            switch(status) {
+                case 'CRITICAL': return '<span class="px-2 py-0.5 bg-red-100 text-red-700 font-bold rounded-full text-[10px]">🔥 Crítico</span>';
+                case 'IN_PROGRESS': return '<span class="px-2 py-0.5 bg-blue-100 text-blue-700 font-bold rounded-full text-[10px]">En Proceso</span>';
+                case 'COMPLETED': return '<span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 font-bold rounded-full text-[10px]">Completado</span>';
+                default: return '<span class="px-2 py-0.5 bg-slate-100 text-slate-600 font-medium rounded-full text-[10px]">Pendiente</span>';
+            }
+        }
+
+        // ==========================================
+        // FUNCIONES DEL MODAL
+        // ==========================================
+        function populateFormDropdowns() {
+            const startSelect = document.getElementById('task-start-month');
+            const endSelect = document.getElementById('task-end-month');
+            const phaseSelect = document.getElementById('task-phase');
+            
+            startSelect.innerHTML = '';
+            endSelect.innerHTML = '';
+            phaseSelect.innerHTML = '';
+
+            monthNames.forEach((month, index) => {
+                startSelect.innerHTML += `<option value="${index}">${month}</option>`;
+                endSelect.innerHTML += `<option value="${index}">${month}</option>`;
+            });
+
+            const allPhases = [...new Set([...defaultPhases, ...tasks.map(t => t.phase)])];
+            allPhases.forEach(phase => {
+                phaseSelect.innerHTML += `<option value="${phase}">${phase}</option>`;
+            });
+        }
+
+        function openAddTaskModal() {
+            populateFormDropdowns();
+            document.getElementById('modal-title').innerText = 'Agregar Nueva Tarea';
+            document.getElementById('task-id').value = '';
+            document.getElementById('task-name').value = '';
+            document.getElementById('task-owner').value = '';
+            document.getElementById('task-start-month').value = 7;
+            document.getElementById('task-end-month').value = 8;
+            document.getElementById('task-status').value = 'IN_PROGRESS';
+            document.getElementById('task-tag').value = 'CPEIP';
+            document.getElementById('task-critical').checked = false;
+            document.getElementById('delete-btn').classList.add('hidden');
+            document.getElementById('task-modal').classList.remove('hidden');
+        }
+
+        function editTask(id) {
+            populateFormDropdowns();
+            const task = tasks.find(t => String(t.id) === String(id));
+            if (!task) return;
+
+            document.getElementById('modal-title').innerText = 'Editar Tarea';
+            document.getElementById('task-id').value = task.id;
+            document.getElementById('task-name').value = task.name;
+            document.getElementById('task-phase').value = task.phase;
+            document.getElementById('task-owner').value = task.owner;
+            document.getElementById('task-start-month').value = task.startMonth;
+            document.getElementById('task-end-month').value = task.endMonth;
+            document.getElementById('task-status').value = task.status;
+            document.getElementById('task-tag').value = task.tag;
+            document.getElementById('task-critical').checked = task.critical;
+            document.getElementById('delete-btn').classList.remove('hidden');
+            document.getElementById('task-modal').classList.remove('hidden');
+        }
+
+        function closeTaskModal() {
+            document.getElementById('task-modal').classList.add('hidden');
+        }
+
+        function saveTask(e) {
+            e.preventDefault();
+            const id = document.getElementById('task-id').value;
+            let startM = parseInt(document.getElementById('task-start-month').value);
+            let endM = parseInt(document.getElementById('task-end-month').value);
+
+            if (endM < startM) {
+                endM = startM;
+            }
+
+            const taskData = {
+                phase: document.getElementById('task-phase').value,
+                name: document.getElementById('task-name').value,
+                owner: document.getElementById('task-owner').value,
+                startMonth: startM,
+                endMonth: endM,
+                status: document.getElementById('task-status').value,
+                tag: document.getElementById('task-tag').value,
+                critical: document.getElementById('task-critical').checked
+            };
+
+            if (id !== "" && id !== null && id !== undefined) {
+                const index = tasks.findIndex(t => String(t.id) === String(id));
+                if (index !== -1) {
+                    tasks[index] = { ...tasks[index], ...taskData };
+                }
+            } else {
+                const newId = tasks.length ? Math.max(...tasks.map(t => Number(t.id) || 0)) + 1 : 1;
+                tasks.push({ id: newId, ...taskData });
+            }
+
+            closeTaskModal();
+            renderGantt();
+        }
+
+        function deleteTask() {
+            const id = document.getElementById('task-id').value;
+            if (!id) return;
+            
+            if (confirm('¿Estás seguro de eliminar esta tarea?')) {
+                tasks = tasks.filter(t => String(t.id) !== String(id));
+                closeTaskModal();
+                renderGantt();
+            }
+        }
+
+        // ==========================================
+        // FUNCIONES DE FILTRO Y RESTABLECIMIENTO
+        // ==========================================
+        function filterTasks(tag, btnElement) {
+            activeFilter = tag;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('bg-f99dark', 'text-white');
+                btn.classList.add('bg-slate-100', 'text-slate-700');
+            });
+            if (btnElement) {
+                btnElement.classList.remove('bg-slate-100', 'text-slate-700');
+                btnElement.classList.add('bg-f99dark', 'text-white');
+            }
+            renderGantt();
+        }
+
+        function resetDefaultData() {
+            document.getElementById('reset-confirm-modal').classList.remove('hidden');
+        }
+
+        function closeResetConfirmModal() {
+            document.getElementById('reset-confirm-modal').classList.add('hidden');
+        }
+
+        function confirmResetTasks() {
+            closeResetConfirmModal();
+            tasks = JSON.parse(JSON.stringify(defaultTasks));
+            localStorage.removeItem('f99_gantt_tasks');
+            renderGantt();
+        }
+
+        // ==========================================
+        // FUNCIONES DE EXPORTACIÓN MEJORADAS
+        // ==========================================
+        function exportToExcel() {
+            const workbook = XLSX.utils.book_new();
+
+            // ==========================================
+            // HOJA 1: CARTA GANTT VISUAL CON BARRAS
+            // ==========================================
+            const ganttRows = [];
+            
+            // Título y Subtítulo
+            ganttRows.push(["FUNDACIÓN 99 - CARTA GANTT DE LANZAMIENTO DIPLOMADO EN EDUCACIÓN (2026-2027)"]);
+            ganttRows.push(["Planificación Estratégica, Certificación CPEIP y Estrategias B2B / B2C"]);
+            ganttRows.push([]);
+
+            // Encabezados de meses
+            const shortMonths = [
+                "ENE 26", "FEB 26", "MAR 26", "ABR 26", "MAY 26", "JUN 26", "JUL 26", 
+                "AGO 26", "SEP 26*", "OCT 26", "NOV 26", "DIC 26", "ENE 27", "FEB 27", "MAR 27*"
+            ];
+            const headerRow = ["ID", "Fase", "Tarea / Hito Estratégico", "Responsable", "Estado", "Vía", ...shortMonths];
+            ganttRows.push(headerRow);
+
+            // Agrupar por fase
+            const phases = [...new Set(tasks.map(t => t.phase))];
+
+            phases.forEach(phaseName => {
+                ganttRows.push([`>>> ${phaseName.toUpperCase()} <<<`]);
+                
+                const phaseTasks = tasks.filter(t => t.phase === phaseName);
+                phaseTasks.forEach(t => {
+                    const row = [
+                        t.id,
+                        t.phase,
+                        (t.critical ? "🔥 " : "") + t.name,
+                        t.owner,
+                        t.status === 'CRITICAL' ? 'CRÍTICO' : 
+                        t.status === 'IN_PROGRESS' ? 'EN PROCESO' : 
+                        t.status === 'COMPLETED' ? 'COMPLETADO' : 'PROGRAMADO',
+                        t.tag
+                    ];
+
+                    // Barras visuales con símbolos según estado
+                    for (let i = 0; i < 15; i++) {
+                        if (i >= t.startMonth && i <= t.endMonth) {
+                            let symbol = "██████";
+                            if (t.status === 'CRITICAL') symbol = "🔥 CRÍTICO";
+                            else if (t.status === 'IN_PROGRESS') symbol = "▓▓▓ EN PROCESO";
+                            else if (t.status === 'COMPLETED') symbol = "███ COMPLETADO";
+                            else symbol = "░░░░ PENDIENTE";
+                            row.push(symbol);
+                        } else {
+                            row.push("");
+                        }
+                    }
+                    ganttRows.push(row);
+                });
+            });
+
+            const ws1 = XLSX.utils.aoa_to_sheet(ganttRows);
+            ws1['!cols'] = [
+                { wch: 5 }, { wch: 35 }, { wch: 50 }, { wch: 25 }, 
+                { wch: 15 }, { wch: 12 }, ...Array(15).fill({ wch: 10 })
+            ];
+
+            // Combinar celdas del título
+            ws1['!merges'] = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: 20 } },
+                { s: { r: 1, c: 0 }, e: { r: 1, c: 20 } }
+            ];
+
+            XLSX.utils.book_append_sheet(workbook, ws1, "Carta Gantt Visual");
+
+            // ==========================================
+            // HOJA 2: DATOS PLANOS
+            // ==========================================
+            const dataRows = [
+                ["ID", "Fase", "Tarea", "Responsable", "Estado", "Vía", "Inicio", "Término", "Crítica", "Duración (meses)"]
+            ];
+            tasks.forEach(t => {
+                dataRows.push([
+                    t.id,
+                    t.phase,
+                    t.name,
+                    t.owner,
+                    t.status,
+                    t.tag,
+                    monthNames[t.startMonth],
+                    monthNames[t.endMonth],
+                    t.critical ? "Sí" : "No",
+                    t.endMonth - t.startMonth + 1
+                ]);
+            });
+
+            const ws2 = XLSX.utils.aoa_to_sheet(dataRows);
+            ws2['!cols'] = [
+                { wch: 5 }, { wch: 30 }, { wch: 45 }, { wch: 25 }, 
+                { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 15 },
+                { wch: 8 }, { wch: 12 }
+            ];
+            XLSX.utils.book_append_sheet(workbook, ws2, "Datos Planos");
+
+            // ==========================================
+            // INTENTAR AGREGAR LOGO
+            // ==========================================
+            const logoUrl = "https://raw.githubusercontent.com/antoniavasquez-oss/Carta-gantt/d041063352279d949000e59acdfc72f52c06ab54/f99-logo.png";
+            
+            fetch(logoUrl)
+                .then(response => {
+                    if (!response.ok) throw new Error('Logo no disponible');
+                    return response.blob();
+                })
+                .then(blob => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const base64 = e.target.result;
+                            XLSX.utils.sheet_add_image(ws1, base64, {
+                                col: 0,
+                                row: 0,
+                                width: 120,
+                                height: 60
+                            });
+                        } catch (imgErr) {
+                            console.warn("Error al añadir imagen:", imgErr);
+                        }
+                        XLSX.writeFile(workbook, "Carta_Gantt_Lanzamiento_Diplomado_F99.xlsx");
+                    };
+                    reader.readAsDataURL(blob);
+                })
+                .catch(() => {
+                    console.warn("Exportando sin logo (no se pudo cargar la imagen)");
+                    XLSX.writeFile(workbook, "Carta_Gantt_Lanzamiento_Diplomado_F99.xlsx");
+                });
+        }
+
+        function exportToCSV() {
+            let csv = "ID,Fase,Tarea,Responsable,Mes Inicio,Mes Término,Estado,Vía,Ruta Crítica\n";
+            tasks.forEach(t => {
+                csv += `"${t.id}","${t.phase}","${t.name}","${t.owner}","${monthNames[t.startMonth]}","${monthNames[t.endMonth]}","${t.status}","${t.tag}","${t.critical ? 'SI' : 'NO'}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "Carta_Gantt_Lanzamiento_Diplomado_F99.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ==========================================
+        // INICIALIZACIÓN
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTasks();
+            renderGantt();
+        });
+    </script>
+</body>
+</html>
